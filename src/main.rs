@@ -1,4 +1,4 @@
-extern crate resa;
+extern crate ecmascript;
 extern crate failure;
 #[macro_use]
 extern crate lazy_static;
