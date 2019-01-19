@@ -6,12 +6,15 @@ version = "0.1.0"
 erased-serde = "0.3.6"
 failure = "0.1.3"
 lazy_static = "*"
-serde = "*"
+serde = { version = "*", features = ['rc'] }
 serde_derive = "*"
 serde_json = "*"
 
 [dependencies.ecmascript]
 source = "https://github.com/dat2/ecmascript"
+
+[dependencies.ratel]
+path = "./ratel/ratel"
 
 [dependencies.uuid]
 features = ["v4", "serde"]

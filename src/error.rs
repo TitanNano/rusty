@@ -17,3 +17,22 @@ pub enum AccessError {
         property: String,
     },
 }
+
+#[derive(Debug, Fail)]
+pub enum TypeError {
+    #[fail(display = "{} is not a valid prototype!", prototype)]
+    IncompatiblePrototype {
+        prototype: String,
+    },
+
+    #[fail(display = "{} is not a function!", type_name)]
+    NotFunction {
+        type_name: String,
+    },
+
+    #[fail(display = "Unable to modify property {} of trimitive type {}!", property, type_name)]
+    PrimitivePropertyWrite {
+        type_name: String,
+        property: String,
+    },
+}

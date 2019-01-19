@@ -1,15 +1,17 @@
 use uuid::Uuid;
 use std::collections::HashMap;
+use std::sync::{ Mutex };
 
 use super::variable::Variable;
 use error::ScopeError;
-use super::traits::CustomType;
+use super::traits::{ SafeBorrow };
+use super::{ CustomTypeObject };
 
 #[derive(Serialize, Debug)]
 pub struct Scope<'a> {
     name: String,
-    type_declarations: HashMap<Uuid, Box<CustomType>>,
-    pub variables: Vec<Variable>,
+    type_declarations: HashMap<Uuid, CustomTypeObject>,
+    pub variables: Vec<Mutex<Variable>>,
     parent: Option<&'a Scope<'a>>,
 }
 
@@ -18,13 +20,13 @@ impl<'a> Scope<'a> {
         &self.name
     }
 
-    pub fn locate(&self, variable_name: &str) -> Result<&Variable, ScopeError> {
+    pub fn locate(&self, variable_name: &str) -> Result<&Mutex<Variable>, ScopeError> {
         for variable in &self.variables {
-            if variable.name() != variable_name {
+            if variable.borrow_safe(|variable| variable.name() != variable_name) {
                 continue;
             }
 
-            return Ok(&variable);
+            return Ok(variable);
         }
 
         match self.parent {
@@ -34,19 +36,21 @@ impl<'a> Scope<'a> {
     }
 
     pub fn add(&mut self, variable: Variable) {
-        self.variables.push(variable);
+        self.variables.push(Mutex::new(variable));
     }
 
-    pub fn add_type(&mut self, type_def: Box<CustomType>) {
-        if self.type_declarations.contains_key(type_def.id()) {
+    pub fn add_type(&mut self, type_def: CustomTypeObject) {
+        let type_id = type_def.borrow_safe(|type_def| *type_def.id());
+
+        if self.type_declarations.contains_key(&type_id) {
             return;
         }
 
-        self.type_declarations.insert(type_def.id().clone(), type_def);
+        self.type_declarations.insert(type_id, type_def);
     }
 
     pub fn new(name: String, parent: Option<&'a Scope<'a>>) -> Self {
-        Self { name, variables: vec!(), parent, type_declarations: HashMap::new() }
+        Self { name, variables: vec!(), parent, type_declarations: HashMap::new(), }
     }
 }
 
