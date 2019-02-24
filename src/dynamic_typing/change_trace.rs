@@ -22,16 +22,28 @@ impl<TC: PartialEq> ChangeTrace<TC> {
         None
     }
 
+    pub fn find(&self, callback: impl Fn(&TraceSet<TC>) -> bool) -> Option<&TraceSet<TC>> {
+        for change in self.changes.iter().rev() {
+            if !callback(&change) {
+                continue;
+            }
+
+            return Some(&change);
+        }
+
+        None
+    }
+
     pub fn new() -> Self {
         ChangeTrace { changes: vec!() }
     }
 }
 
 #[derive(Debug, Serialize, PartialEq, Clone)]
-struct TraceSet<T> {
-    attribute: T,
-    loc: Location,
-    current_type: Type
+pub struct TraceSet<T> {
+    pub attribute: T,
+    pub loc: Location,
+    pub current_type: Type
 }
 
 struct TraceResult<'s> {
@@ -51,10 +63,25 @@ pub enum TracedTypeMuation {
 
 #[derive(Debug, Serialize, PartialEq, Clone)]
 pub struct Location {
-    start: u32,
-    end: u32,
-    line: u32,
-    column: u32,
+    pub start: u32,
+    pub end: u32,
+    pub line: u32,
+    pub column: u32,
+}
+
+impl Location {
+    pub fn collapse(mut self, after: bool) -> Self {
+        if after {
+            self.end += 1;
+            self.start = self.end;
+
+            return self;
+        }
+
+        self.end = self.start;
+
+        self
+    }
 }
 
 impl<T> From<Ast::Loc<T>> for Location {

@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
-use super::{ ObjectType, FunctionType, SafeBorrow, MutexRef, new_mutex_ref, CustomTypeObject };
+use super::{ ObjectType, FunctionType, SafeBorrow, MutexRef, new_mutex_ref, CustomTypeObject, Location };
 use super::traits::CustomType;
 use statics::{ OBJECT_PROTOTYPE };
 use std::sync::{ Arc };
+use ratel::{ ast as Ast };
 
 //use serde::{ Serialize, Serializer };
 //use serde::ser::{ SerializeStructVariant };
-use ratel::{ ast as Ast };
 
 #[derive(PartialEq, Debug, Clone, Serialize)]
 pub enum Type {
@@ -63,6 +63,14 @@ impl Type {
             Type::Object(data) => data.borrow_mut_safe(|data| data.assign_name(name.to_owned())),
             Type::Function(data) => data.borrow_mut_safe(|data| data.assign_name(name.to_owned())),
             _ => ()
+        }
+    }
+
+    pub fn query_property<T>(&self, property: &str, location: Ast::Loc<T>) -> Option<Type> {
+        match self {
+            Type::Object(data) => data.borrow_safe(|data| data.query_property(property, Location::from(location))),
+            Type::Function(data) => data.borrow_safe(|data| data.query_property(property, Location::from(location))),
+            _ => None,
         }
     }
 }

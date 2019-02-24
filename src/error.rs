@@ -1,4 +1,5 @@
 use failure::*;
+use dynamic_typing::{ Location };
 
 #[derive(Debug, Fail)]
 pub enum ScopeError {
@@ -35,4 +36,23 @@ pub enum TypeError {
         type_name: String,
         property: String,
     },
+}
+
+#[derive(Debug, Fail)]
+pub enum ValidationError {
+
+    #[fail(display = "{} has no property {}", object, property)]
+    UnknownProperty {
+        object: String,
+        property: String,
+        location: Location,
+    }
+}
+
+impl ValidationError {
+    pub fn location(&self) -> &Location {
+        match self {
+            ValidationError::UnknownProperty { location, .. } => &location,
+        }
+    }
 }

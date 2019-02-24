@@ -19,3 +19,7 @@ path = "./ratel/ratel"
 [dependencies.uuid]
 features = ["v4", "serde"]
 version = "*"
+
+[dependencies.toolshed]
+version = "0.4"
+features = ["impl_serialize"]

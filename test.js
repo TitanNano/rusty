@@ -38,7 +38,12 @@ Controller.data = {
     tester: '',
 };
 
+Controller.data;
+
+Controller.something;
+
 PageController._current = 12;
 PageController.pageTitle = 'New Page';
+PageController.state = 'text';
 
 list2 = "not a list any more!";
