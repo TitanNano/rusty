@@ -35,7 +35,7 @@ impl FunctionType {
         self.invocations.push((arguments, location));
     }
 
-    pub fn query_property(&self, property: &str, location: Location) -> Option<Type> {
+    pub fn query_property(&self, property: &str, location: &Location) -> Option<Type> {
         let mutation = self.properties_change_trace.find(|change_set| {
             if change_set.loc.start > location.end {
                 return false;
@@ -48,16 +48,11 @@ impl FunctionType {
             }
         });
 
-        if mutation.is_none() {
-            return None;
-        }
 
-        let mutation =  mutation.unwrap();
-
-        match mutation.attribute {
+        match mutation?.attribute {
             TracedTypeMuation::Remove(_) => None,
-            TracedTypeMuation::Add(_) => Some(mutation.current_type.clone()),
-            TracedTypeMuation::Update(_) => Some(mutation.current_type.clone()),
+            TracedTypeMuation::Add(_) => Some(mutation?.current_type.clone()),
+            TracedTypeMuation::Update(_) => Some(mutation?.current_type.clone()),
         }
     }
 }
@@ -65,7 +60,7 @@ impl FunctionType {
 impl CustomType for FunctionType {
     fn assign_name(&mut self, name: String) {
         match self.name {
-            Some(_) => return,
+            Some(_) => {},
             None => self.name = Some(name),
         };
     }
@@ -73,12 +68,16 @@ impl CustomType for FunctionType {
     fn name(&self) -> &str {
         match &self.name {
             Some(name) => &name,
-            None => "",
+            None => "AnonymousFunction",
         }
     }
 
     fn id(&self) -> &Uuid {
         &self.id
+    }
+
+    fn is_array(&self) -> bool {
+        false
     }
 }
 

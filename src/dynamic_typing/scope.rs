@@ -1,17 +1,16 @@
 use uuid::Uuid;
 use std::collections::HashMap;
-use std::sync::{ Mutex };
 
 use super::variable::Variable;
 use error::ScopeError;
 use super::traits::{ SafeBorrow };
-use super::{ CustomTypeObject };
+use super::{ CustomTypeObject, new_mutex_ref, MutexRef };
 
 #[derive(Serialize, Debug)]
 pub struct Scope<'a> {
     name: String,
     type_declarations: HashMap<Uuid, CustomTypeObject>,
-    pub variables: Vec<Mutex<Variable>>,
+    pub variables: Vec<MutexRef<Variable>>,
     parent: Option<&'a Scope<'a>>,
 }
 
@@ -20,13 +19,13 @@ impl<'a> Scope<'a> {
         &self.name
     }
 
-    pub fn locate(&self, variable_name: &str) -> Result<&Mutex<Variable>, ScopeError> {
+    pub fn locate(&self, variable_name: &str) -> Result<MutexRef<Variable>, ScopeError> {
         for variable in &self.variables {
             if variable.borrow_safe(|variable| variable.name() != variable_name) {
                 continue;
             }
 
-            return Ok(variable);
+            return Ok(variable.to_owned());
         }
 
         match self.parent {
@@ -36,7 +35,7 @@ impl<'a> Scope<'a> {
     }
 
     pub fn add(&mut self, variable: Variable) {
-        self.variables.push(Mutex::new(variable));
+        self.variables.push(new_mutex_ref(variable));
     }
 
     pub fn add_type(&mut self, type_def: CustomTypeObject) {

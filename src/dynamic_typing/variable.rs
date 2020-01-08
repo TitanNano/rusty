@@ -55,3 +55,9 @@ impl From<Ast::DeclarationKind> for VariableKind {
         }
     }
 }
+
+impl ToString for Variable {
+    fn to_string(&self) -> String {
+        self.name.clone()
+    }
+}

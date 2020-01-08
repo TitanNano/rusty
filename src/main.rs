@@ -10,6 +10,7 @@ extern crate serde_json;
 extern crate erased_serde;
 extern crate uuid;
 extern crate toolshed;
+extern crate rand;
 
 mod dynamic_typing;
 mod statics;
@@ -20,16 +21,16 @@ mod literals;
 mod objects;
 mod traveler;
 mod validation;
-mod owner;
+mod ast_nodes;
 
 use std::fs::File;
 use std::io::prelude::*;
-use std::sync::{ Mutex };
+use std::iter::repeat;
 use ratel::{ parse, ast as Ast };
 use failure::*;
 
 use dynamic_typing::{
-    Type, Scope, Variable, VariableKind, CustomTypeObject, Location
+    Type, Scope, Variable, VariableKind, CustomTypeObject, new_mutex_ref
 };
 use statics::{ OBJECT };
 use tracing::{ tracing_pass };
@@ -41,7 +42,7 @@ fn main() {
 
     let mut static_root_scope: Scope = Scope::new(String::from("StaticRoot"), None);
 
-    static_root_scope.variables = vec!(Mutex::new(global_object));
+    static_root_scope.variables = vec!(new_mutex_ref(global_object));
 
     // read test.js
     let mut file = File::open("/Users/Jovan/rusty/test.js").unwrap();
@@ -60,7 +61,7 @@ fn main() {
 
     let (module_scope, errors) = analyze_ast(module_body, &static_root_scope);
 
-    println!("{}", serde_json::to_string_pretty(&module_scope).unwrap());
+    // println!("{}", serde_json::to_string_pretty(&module_scope).unwrap());
 
     for error in errors {
         println!("Error while analyzing scope <{}>: {:?}", module_scope.name(), error);
@@ -75,10 +76,22 @@ fn main() {
     let validation_errors = validation_pass(module_body, &module_scope);
 
     for error in validation_errors {
-        let real_location = get_line_from_offset(error.location(), &structured_content);
+        let (line_start, column_start) = get_line_from_offset(error.location().start, &structured_content);
+        let (_, column_end) = get_line_from_offset(error.location().end, &structured_content);
+        let line_content = structured_content[line_start as usize];
+        let mut range = column_end - column_start;
 
-        println!("Validation Error: {} at {}", error, real_location);
+        if range < 0 {
+            range = column_end;
+        }
+
+        let padding = repeat(" ").take(column_start as usize).collect::<String>();
+        let locator = repeat("^").take(range as usize).collect::<String>();
+
+        println!("Validation Error: {} at {}", error, get_line_from_offset_as_string(error.location().start, &structured_content));
+        println!("{}\n{}{}", line_content, padding, locator);
     }
+
 }
 
 fn analyze_ast<'a, 'b>(body: Ast::StatementList, static_root_scope: &'a Scope<'b>) -> (Scope<'a>, Vec<Error>) {
@@ -163,29 +176,42 @@ fn analyze_assignment_pattern(_pattern: &Ast::Pattern, _default: &Ast::Expressio
     panic!("Assignment Patterns are not implemented!");
 }
 
-fn get_line_from_offset(location: &Location, content: &[&str]) -> String {
+fn get_line_from_offset(location: u32, content: &[&str]) -> (i32, i32) {
     let mut counter = 0;
-    let mut line_number = 1;
+    let mut line_number = 0;
 
     for line in content {
         // add 1 here to account for the new line byte
         let line_lenght = (line.len() + 1) as u32;
         let future_counter = counter + line_lenght;
 
-        if location.start >= future_counter {
+        if location >= future_counter {
             line_number += 1;
             counter = future_counter;
 
             continue;
         }
 
-        let byte_column = (location.start - counter) as usize;
+        let byte_column = (location - counter) as u32;
         // column starts at 1 not 0
-        let column = 1 + (&line[..byte_column]).chars().count();
+        let column = (&line[..byte_column as usize]).chars().count() as i32;
 
-
-        return format!("{}:{}", line_number, column);
+        return (line_number, column);
     }
 
-    "out-of-bounds".to_owned()
+    (-1, -1)
+}
+
+fn get_line_from_offset_as_string(location: u32, content: &[&str]) -> String {
+    let (line, column) = get_line_from_offset(location, content);
+
+    line_column_as_string(line, column)
+}
+
+fn line_column_as_string(line: i32, column: i32) -> String {
+    if line < 0 || column < 0 {
+        return "out-of-bounds".to_string()
+    }
+
+    format!("{}:{}", line + 1, column + 1)
 }

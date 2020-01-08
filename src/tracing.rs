@@ -65,7 +65,7 @@ fn trace_expression(expression: Ast::ExpressionNode, scope: &mut Scope, error_co
                 let property = member_expression.property.item.to_string();
 
                 match object_type {
-                    Type::Object(mut object_data) => {
+                    Type::Object(object_data) => {
                         let has_property = object_data.borrow_safe(|object_data| object_data.properties.contains_key(&property));
 
                         let change = if has_property {
@@ -79,7 +79,7 @@ fn trace_expression(expression: Ast::ExpressionNode, scope: &mut Scope, error_co
                         });
                     },
 
-                    Type::Function(mut object_data) => {
+                    Type::Function(object_data) => {
                         let has_property = object_data.borrow_safe(|object_data| object_data.properties.contains_key(&property));
 
                         let change = if has_property {
@@ -127,7 +127,6 @@ fn trace_expression(expression: Ast::ExpressionNode, scope: &mut Scope, error_co
 
                 _ => {
                     error_collection.push(Error::from(TypeError::NotFunction { type_name: expression_to_string(&expression.item) }));
-                    return;
                 }
             }
         },

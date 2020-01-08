@@ -14,7 +14,7 @@ pub fn type_from_properties(properties: &[Ast::Property], scope: &Scope) -> Resu
             },
 
             Ast::Property::Shorthand(property) => {
-                (property.to_string(), determine_expression_type(&Ast::Expression::Identifier(property), &scope)?)
+                ((*property).to_string(), determine_expression_type(&Ast::Expression::Identifier(property), &scope)?)
             },
 
             Ast::Property::Method { key, value: _value } => {
@@ -70,14 +70,14 @@ pub fn determine_member_type(expression: &Ast::Expression, property: Ast::Node<'
     if let Some(type_) = member_type {
         Ok(type_)
     } else {
-        Err(AccessError::UndefinedProperty { property: property.item.to_string(), object: object.to_string() })?
+        Err(AccessError::UndefinedProperty { property: property.item.to_string(), object: object.to_string() }.into())
     }
 }
 
 fn property_to_string(property_key: &Ast::PropertyKey) -> String {
     match property_key {
-        Ast::PropertyKey::Literal (value) => value.to_string(),
-        Ast::PropertyKey::Binary (value) => value.to_string(),
+        Ast::PropertyKey::Literal (value) => (*value).to_string(),
+        Ast::PropertyKey::Binary (value) => (*value).to_string(),
         Ast::PropertyKey::Computed (expression_node) => expression_to_string(&expression_node.item),
     }
 }

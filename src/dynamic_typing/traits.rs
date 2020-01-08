@@ -11,10 +11,11 @@ pub trait CustomType where Self: Serialize + Debug + Sync + Send + TracedChange<
     fn assign_name(&mut self, name: String);
     fn name(&self) -> &str;
     fn id(&self) -> &Uuid;
+    fn is_array(&self) -> bool;
 }
 
-impl PartialEq for CustomType {
-    fn eq(&self, other: &CustomType) -> bool {
+impl PartialEq for dyn CustomType {
+    fn eq(&self, other: &dyn CustomType) -> bool {
         self.id() == other.id()
     }
 }

@@ -1,6 +1,7 @@
 const MyNewObject = {
     test: 2,
     value: 'ab',
+    data: null,
     sub: 'string',
 }, var1 = 12;
 
@@ -13,6 +14,9 @@ let list = ["hallo", 132, "welt"];
  */
 var list2 = list;
 var secondObject = MyNewObject;
+
+MyNewObject.data = 'data string';
+MyNewObject.data = 'more data text';
 
 const Controller = {
     init(name, type) {}
@@ -38,7 +42,7 @@ Controller.data = {
     tester: '',
 };
 
-Controller.data;
+Controller.data = 'test';
 
 Controller.something;
 

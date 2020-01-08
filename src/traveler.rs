@@ -1,160 +1,132 @@
 use ratel::{ ast as Ast };
-use toolshed::Arena;
-use std::ops::{ Deref, DerefMut };
-use owner::Owner;
+use ast_nodes::{ ExpressionNode, ExpressionNodeStruct, NewExpressionNodeFromAst, StringNodeStruct };
+use dynamic_typing::{ Location };
 
-pub enum HookType<'own, 're, T: PiggybackCapable + 'own> {
+pub enum AstEvent<'ast, En: ExpressionNode<'ast>> {
     Assignment {
-        ident: &'re Backpack<'own, T>,
-        receiver: Backpack<'own, T>,
-        value: Backpack<'own, T>,
+        node: En,
+        left: En,
+        right: En,
     },
 
     Addition {
-        ident: &'re Backpack<'own, T>,
-        receiver: Backpack<'own, T>,
-        value: Backpack<'own, T>,
+        node: En,
+        left: En,
+        right: En,
     },
 
     Equality {
-        ident: &'re Backpack<'own, T>,
-        left: Backpack<'own, T>,
-        right: Backpack<'own, T>,
-    },
-
-    StrictInequality {
-        ident: &'re Backpack<'own, T>,
-        left: Backpack<'own, T>,
-        right: Backpack<'own, T>,
+        node: En,
+        left: En,
+        right: En,
     },
 
     Conditional {
-        test: &'re Backpack<'own, T>,
-        consequent: Backpack<'own, T>,
-        alternate: Backpack<'own, T>,
+        node: En,
+        test: En,
+        consequent: En,
+        alternate: En,
     },
 
     PropertyAccess {
-        ident: &'re Backpack<'own, T>,
-        object: Backpack<'own, T>,
-        property: Ast::IdentifierNode<'own>,
+        node: En,
+        object: En,
+        property: StringNodeStruct,
     },
 
     DynamicPropertyAccess {
-        ident: &'re Backpack<'own, T>,
-        object: Backpack<'own, T>,
-        property: Backpack<'own, T>,
+        node: En,
+        object: En,
+        property: En,
     },
 
     ConsequentBody {
-        test: &'re Backpack<'own, T>,
-        consequent: Ast::StatementNode<'own>,
+        expression: En,
     },
 
     AlternateBody {
-        test: &'re Backpack<'own, T>,
-        alternate: Ast::StatementNode<'own>,
+        expression: En,
     },
 
     AfterIf {
-        test: &'re Backpack<'own, T>,
+        expression: En,
     },
 
     Identifier {
-        node: &'re Backpack<'own, T>,
-        identifier: &'re str,
+        node: En,
+        identifier: Ast::Identifier<'ast>
+
     },
 
     Literal {
-        ident: &'re Backpack<'own, T>,
-        literal: Ast::Literal<'own>,
+        node: En,
+        literal: Ast::Literal<'ast>,
     },
 
     Array {
-        ident: &'re Backpack<'own, T>,
-        expression: Ast::expression::ArrayExpression<'own>,
+        node: En,
+        expression: Ast::expression::ArrayExpression<'ast>,
     },
 
     Sequence {
-        ident: &'re Backpack<'own, T>,
-        sequence: Ast::ExpressionList<'own>,
+        node: En,
+        sequence: Ast::ExpressionList<'ast>,
     },
 
     This {
-        ident: &'re Backpack<'own, T>,
+        node: En,
+        this: Ast::expression::ThisExpression
     },
 
     PreOrPostFix {
-        ident: &'re Backpack<'own, T>,
-        operator: Ast::OperatorKind,
-        operand: Backpack<'own, T>
+        node: En,
+        operand: En,
+        operator: Ast::OperatorKind
     },
 
     Template {
-        ident: &'re Backpack<'own, T>
+        node: En,
     },
 
     FunctionCall {
-        ident: &'re Backpack<'own, T>,
-        function: Backpack<'own, T>,
-        arguments: Vec<Backpack<'own, T>>,
+        node: En,
+        function: En,
+        arguments: Vec<En>,
     },
 
     Spread {
-        ident: &'re Backpack<'own, T>,
-        item: Backpack<'own, T>,
+        node: En,
+        argument: En,
     },
 
     Object {
-        ident: &'re Backpack<'own, T>,
-        body: Ast::NodeList<'own, Ast::Property<'own>>,
+        node: En,
+        expression: Ast::expression::ObjectExpression<'ast>,
     },
 
     Function {
-        ident: &'re Backpack<'own, T>,
-        params: Ast::PatternList<'own>,
-        body: &'re Ast::Node<'own, Ast::BlockStatement<'own>>,
-        arrow: bool,
+        node: En,
+        params: toolshed::list::List<'ast, ratel::ast::Node<'ast, ratel::ast::Pattern<'ast>>>,
+        body: AstFunctionBody<'ast>,
     },
 
     Class {
-        ident: &'re Backpack<'own, T>,
-        class: Ast::expression::ClassExpression<'own>
+        node: En,
+        class_expression: Ast::Class<'ast, Ast::OptionalName<'ast>>,
     }
 }
 
-
-pub struct Backpack<'own, T: PiggybackCapable + 'own> {
-    own: Ast::ExpressionNode<'own>,
-    carried: T,
+pub enum AstFunctionBody<'ast> {
+    StatementBlock(Ast::Block<'ast, Ast::Statement<'ast>>),
+    SingleExpression(Ast::Expression<'ast>)
 }
 
-impl<'own, T: PiggybackCapable> Backpack<'own, T> {
-    fn update(&mut self, hook_data: Ast::ExpressionNode<'own>) {
-        self.own = hook_data;
-    }
-
-    fn carry(&mut self, data: T) {
-        self.carried = data;
-    }
-
-    fn new(own: Ast::ExpressionNode<'own>) -> Self {
-        Self { own, carried: T::new() }
-    }
-}
-
-impl<'own, T: PiggybackCapable> Deref for Backpack<'own, T> {
-    type Target = Ast::ExpressionNode<'own>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.own
-    }
-}
-
-impl<'own, T: PiggybackCapable> DerefMut for Backpack<'own, T> {
-
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.own
+impl<'ast> From<Ast::expression::ArrowBody<'ast>> for AstFunctionBody<'ast> {
+    fn from(value: Ast::expression::ArrowBody) -> AstFunctionBody {
+        match value {
+            Ast::expression::ArrowBody::Block(block) => AstFunctionBody::StatementBlock(**block),
+            Ast::expression::ArrowBody::Expression(expression) => AstFunctionBody::SingleExpression(**expression),
+        }
     }
 }
 
@@ -162,125 +134,139 @@ pub trait PiggybackCapable {
     fn new() -> Self;
 }
 
+pub fn travel_ast<'ast>(ast: Ast::StatementList<'ast>) -> Vec<AstEvent<'ast, ExpressionNodeStruct<'ast>>> {
+    let mut event_record = vec!();
 
-pub fn travel_ast<'a, 'b, T: PiggybackCapable + 'a, Func: FnMut(&HookType<T>)>(ast: Ast::StatementList<'a>, mut callback: Func) {
     for statement in ast {
         match statement.item {
             Ast::Statement::Expression(expression) => {
-                travel_expression(expression, &mut callback);
+                let (_, local_event_record) = travel_expression(expression, event_record);
+
+                event_record = local_event_record;
             },
 
             Ast::Statement::If(if_statement) => {
-                let test = travel_expression(if_statement.test, &mut callback);
+                let (test, local_event_record) = travel_expression(if_statement.test, event_record);
 
-                callback(&HookType::ConsequentBody { test: &test, consequent: if_statement.consequent });
+                event_record = local_event_record;
 
-                if let Some(alternate) = if_statement.alternate {
-                    callback(&HookType::AlternateBody { test: &test, alternate });
+                event_record.push(AstEvent::ConsequentBody { expression: test.clone() });
+
+                if if_statement.alternate.is_some() {
+                    event_record.push(AstEvent::AlternateBody { expression: test.clone() });
                 }
 
-                callback(&HookType::AfterIf { test: &test });
+                event_record.push(AstEvent::AfterIf { expression: test.clone() });
+
             }
 
-            _ => (),
-        }
-    }
+            _ => {},
+        };
+    };
+
+    event_record
 }
 
-fn travel_expression<'local_ast, 'b, T: PiggybackCapable + 'local_ast>(expression: Ast::ExpressionNode<'local_ast>, callback: &mut impl FnMut(&HookType<T>)) -> Backpack<'local_ast, T> {
-
-    match expression.item {
+fn travel_expression<'ast>(expression: Ast::ExpressionNode<'ast>, mut event_record: Vec<AstEvent<'ast, ExpressionNodeStruct<'ast>>>) -> (ExpressionNodeStruct<'ast>, Vec<AstEvent<'ast, ExpressionNodeStruct<'ast>>>) {
+    let expression = match expression.item {
         Ast::Expression::Binary(binary_expression) => {
+            let node = ExpressionNodeStruct::from(expression);
             let operator = binary_expression.operator;
-            let left = travel_expression(binary_expression.left, callback);
-            let right = travel_expression(binary_expression.right, callback);
-            let ident = Backpack::new(expression);
+            let (left, new_event_record) = travel_expression(binary_expression.left, event_record);
+            let (right, new_event_record) = travel_expression(binary_expression.right, new_event_record);
+
+            event_record = new_event_record;
 
             match operator {
                 Ast::OperatorKind::Assign => {
-                    callback(&HookType::Assignment { ident: &ident, receiver: left, value: right, });
+                    event_record.push(AstEvent::Assignment { node: node.clone(), left, right });
                 },
 
                 Ast::OperatorKind::Addition => {
-                    callback(&HookType::Addition { ident: &ident, receiver: left, value: right, });
+                    event_record.push(AstEvent::Addition { node: node.clone(), left, right });
                 },
 
                 Ast::OperatorKind::StrictEquality => {
-                    callback(&HookType::Equality { ident: &ident, left, right });
+                    event_record.push(AstEvent::Equality { node: node.clone(), left, right });
                 }
 
                 Ast::OperatorKind::StrictInequality => {
-                    callback(&HookType::StrictInequality { ident: &ident, left, right });
+                    event_record.push(AstEvent::Equality { node: node.clone(), left, right });
                 }
 
                 _ => (),
             };
 
-            ident
+            node
         },
 
         Ast::Expression::Conditional(conditional_expression) => {
-            let test = travel_expression(conditional_expression.test, callback);
-            let consequent = travel_expression(conditional_expression.consequent, callback);
-            let alternate = travel_expression(conditional_expression.consequent, callback);
+            let node = ExpressionNodeStruct::from(expression);
+            let (test, new_event_record) = travel_expression(conditional_expression.test, event_record);
+            let (consequent, new_event_record) = travel_expression(conditional_expression.consequent, new_event_record);
+            let (alternate, new_event_record) = travel_expression(conditional_expression.consequent, new_event_record);
 
-            callback(&HookType::Conditional { test: &test, consequent, alternate });
+            event_record = new_event_record;
 
-            test
+            event_record.push(AstEvent::Conditional { node: node.clone(), test, consequent, alternate });
+
+            node
         },
 
         Ast::Expression::Member(member_expression) => {
-            let object = travel_expression(member_expression.object, callback);
-            let property = member_expression.property;
-            let ident = Backpack::new(expression);
+            let node = ExpressionNodeStruct::from(expression);
+            let (object, new_event_record) = travel_expression(member_expression.object, event_record);
+            let property = StringNodeStruct::from(member_expression.property);
 
-            callback(&HookType::PropertyAccess { ident: &ident, object, property: property });
+            event_record = new_event_record;
 
-            ident
+            event_record.push(AstEvent::PropertyAccess { node: node.clone(), object, property });
+
+            node
         }
 
         Ast::Expression::Identifier(identifier_expression) => {
-            let node = Backpack::new(expression);
+            let node = ExpressionNodeStruct::from(expression);
 
-            callback(&HookType::Identifier { node: &node, identifier: identifier_expression });
+            event_record.push(AstEvent::Identifier { node: node.clone(), identifier: identifier_expression });
 
             node
         },
 
         Ast::Expression::Void => {
-            Backpack::new(expression)
+            ExpressionNodeStruct::from(expression)
         },
 
         Ast::Expression::Literal(literal_expression) => {
-            let ident = Backpack::new(expression);
+            let node = ExpressionNodeStruct::from(expression);
 
-            callback(&HookType::Literal { ident: &ident, literal: literal_expression });
+            event_record.push(AstEvent::Literal { node: node.clone(), literal: literal_expression });
 
-            ident
+            node
         },
 
         Ast::Expression::Array(array_expression) => {
-            let ident = Backpack::new(expression);
+            let node = ExpressionNodeStruct::from(expression);
 
-            callback(&HookType::Array { ident: &ident, expression: array_expression });
+            event_record.push(AstEvent::Array { node: node.clone(), expression: array_expression });
 
-            ident
+            node
         },
 
         Ast::Expression::Sequence(sequence_expression) => {
-            let ident = Backpack::new(expression);
+            let node = ExpressionNodeStruct::from(expression);
 
-            callback(&HookType::Sequence { ident: &ident, sequence: sequence_expression.body });
+            event_record.push(AstEvent::Sequence { node: node.clone(), sequence: sequence_expression.body });
 
-            ident
+            node
         },
 
         Ast::Expression::This(this_expression) => {
-            let ident = Backpack::new(expression);
+            let node = ExpressionNodeStruct::from(expression);
 
-            callback(&HookType::This { ident: &ident, });
+            event_record.push(AstEvent::This { node: node.clone(), this: this_expression });
 
-            ident
+            node
         },
 
         Ast::Expression::MetaProperty(meta_property) => {
@@ -288,133 +274,134 @@ fn travel_expression<'local_ast, 'b, T: PiggybackCapable + 'local_ast>(expressio
         },
 
         Ast::Expression::ComputedMember(computed_member) => {
-            let ident = Backpack::new(expression);
-            let object = travel_expression(computed_member.object, callback);
-            let property = travel_expression(computed_member.property, callback);
+            let node = ExpressionNodeStruct::from(expression);
+            let (object, new_event_record) = travel_expression(computed_member.object, event_record);
+            let (property, new_event_record) = travel_expression(computed_member.property, new_event_record);
 
-            callback(&HookType::DynamicPropertyAccess { ident: &ident, object, property });
+            event_record = new_event_record;
 
-            ident
+            event_record.push(AstEvent::DynamicPropertyAccess { node: node.clone(), object, property });
+
+            node
         },
 
         Ast::Expression::Call(function_call) => {
-            let ident = Backpack::new(expression);
-            let function = travel_expression(function_call.callee, callback);
-            let arguments: Vec<Backpack<T>> = function_call.arguments.iter().map(|argument| travel_expression(*argument, callback)).collect();
+            let node = ExpressionNodeStruct::from(expression);
+            let (function, local_event_record) = travel_expression(function_call.callee, event_record);
+            let mut arguments = vec!();
 
-            callback(&HookType::FunctionCall { ident: &ident, function, arguments });
+            event_record = local_event_record;
 
-            ident
+            for argument in function_call.arguments {
+                let (expression, local_event_record) = travel_expression(*argument, event_record);
+
+                event_record = local_event_record;
+
+                arguments.push(expression);
+            }
+
+            event_record.push(AstEvent::FunctionCall { node: node.clone(), function, arguments });
+
+            node
         },
 
         Ast::Expression::Prefix(prefix) => {
-            let ident = Backpack::new(expression);
-            let operand = travel_expression(prefix.operand, callback);
+            let node = ExpressionNodeStruct::from(expression);
+            let (operand, local_event_record) = travel_expression(prefix.operand, event_record);
             let operator = prefix.operator;
 
-            callback(&HookType::PreOrPostFix { ident: &ident, operand, operator });
+            event_record = local_event_record;
 
-            ident
+            event_record.push(AstEvent::PreOrPostFix { node: node.clone(), operand, operator });
+
+            node
         },
 
         Ast::Expression::Postfix(postfix) => {
-            let ident = Backpack::new(expression);
-            let operand = travel_expression(postfix.operand, callback);
+            let node = ExpressionNodeStruct::from(expression);
+            let (operand, local_event_record) = travel_expression(postfix.operand, event_record);
             let operator = postfix.operator;
 
-            callback(&HookType::PreOrPostFix { ident: &ident, operand, operator });
+            event_record = local_event_record;
 
-            ident
+            event_record.push(AstEvent::PreOrPostFix { node: node.clone(), operand, operator });
+
+            node
         }
 
-        Ast::Expression::Template(template) => {
-            let ident = Backpack::new(expression);
+        Ast::Expression::Template(_template) => {
+            let node = ExpressionNodeStruct::from(expression);
 
             // we are currently ignoring all expressions inside the template literal
-            callback(&HookType::Template { ident: &ident });
+            event_record.push(AstEvent::Template { node: node.clone() });
 
-            ident
+            node
         },
 
         Ast::Expression::TaggedTemplate(template) => {
-            let ident = Backpack::new(expression);
-            let function = travel_expression(template.tag, callback);
+            let (_function, local_event_record) = travel_expression(template.tag, event_record);
             let template_expression = Ast::Expression::Template(**template.quasi);
-            let loc = Ast::Loc::new(template.quasi.start, template.quasi.end, template_expression);
-            let arguments = vec!(travel_expression(Ast::ExpressionNode::new(&loc), callback));
+            let loc = Location::from(*template.quasi);
+            let node = ExpressionNodeStruct::new(template_expression, loc);
 
-            callback(&HookType::FunctionCall { ident: &ident, function, arguments });
+            event_record = local_event_record;
 
-            ident
+        //    let arguments = vec!(travel_expression(Ast::ExpressionNode::new(loc_ref), arena, callback));
+
+        //    event_record.push(AstEvent::FunctionCall { node, function });
+
+            node
         },
 
         Ast::Expression::Spread(spread_expression) => {
-            let ident = Backpack::new(expression);
-            let item = travel_expression(spread_expression.argument, callback);
+            let node = ExpressionNodeStruct::from(expression);
+            let (argument, local_event_record) = travel_expression(spread_expression.argument, event_record);
 
-            callback(&HookType::Spread { ident: &ident, item });
+            event_record = local_event_record;
 
-            ident
+            event_record.push(AstEvent::Spread { node: node.clone(), argument });
+
+            node
         },
 
         Ast::Expression::Object(object_expression) => {
-            let ident = Backpack::new(expression);
+            let node = ExpressionNodeStruct::from(expression);
 
-            callback(&HookType::Object { ident: &ident, body: object_expression.body });
+            event_record.push(AstEvent::Object { node: node.clone(), expression: object_expression });
 
-            ident
+            node
         },
 
         Ast::Expression::Arrow(arrow_function) => {
-            let ident = Backpack::new(expression);
-            let arena = Arena::new();
+            let node = ExpressionNodeStruct::from(expression);
             let Ast::expression::ArrowExpression { params, body, .. } = arrow_function;
+            let function_body = AstFunctionBody::from(body);
 
-            let body = match body {
-                Ast::expression::ArrowBody::Block(block) => { block },
-                Ast::expression::ArrowBody::Expression(expression) => {
-                    let return_statement = Ast::Statement::Return(Ast::statement::ReturnStatement {
-                        value: Some(expression)
-                    });
-                    let return_statement_loc = Ast::Loc::new(expression.start, expression.end, return_statement);
-                    let return_statement_loc = &*arena.alloc(return_statement_loc);
-                    let return_statement_node = Ast::Node::new(&return_statement_loc);
+            event_record.push(AstEvent::Function { node: node.clone(), params, body: function_body });
 
-                    let block_statement = Ast::Block {
-                        body: Ast::NodeList::from(&arena, return_statement_node)
-                    };
-
-                    let block_statement_loc = Ast::Loc::new(expression.start, expression.end, block_statement);
-                    let block_statement_loc = arena.alloc(block_statement_loc);
-
-                    let node = Ast::Node::new(&block_statement_loc);
-
-                    node
-                },
-
-            };
-
-//            callback(&HookType::Function { ident: &ident, params, body: &body, arrow: true });
-
-            ident
+            node
         },
 
         Ast::Expression::Function(function) => {
-            let ident = Backpack::new(expression);
+            let node = ExpressionNodeStruct::from(expression);
             let Ast::Function { params, body, .. } = function;
+            let statement_list = AstFunctionBody::StatementBlock(**body);
 
-            callback(&HookType::Function { ident: &ident, params, body: &body, arrow: false });
 
-            ident
+            event_record.push(AstEvent::Function { node: node.clone(), params, body: statement_list });
+
+            node
         },
 
         Ast::Expression::Class(class_expression) => {
-            let ident = Backpack::new(expression);
+            let node = ExpressionNodeStruct::from(expression);
 
-            callback(&HookType::Class { ident: &ident, class: class_expression });
+            event_record.push(AstEvent::Class { class_expression, node: node.clone() });
 
-            ident
+            node
         }
 
-    }
+    };
+
+    (expression, event_record)
 }

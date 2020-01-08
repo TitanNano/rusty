@@ -37,11 +37,9 @@ impl ObjectType {
         }
     }
 
-    pub fn is_array(&self) -> bool {
-        self.is_array
-    }
+    pub fn query_property(&self, property: &str, location: &Location) -> Option<Type> {
+        let property_type = self.properties.get(property);
 
-    pub fn query_property(&self, property: &str, location: Location) -> Option<Type> {
         let mutation = self.properties_change_trace.find(|change_set| {
             if location.end < change_set.loc.start {
                 return false;
@@ -52,7 +50,17 @@ impl ObjectType {
                 TracedTypeMuation::Remove(name) => name == property,
                 TracedTypeMuation::Update(name) => name == property,
             }
-        })?;
+        });
+
+        if mutation.is_none() {
+            if let Some(property_type) = property_type {
+                return Some(property_type.to_owned())
+            }
+
+            return None;
+        }
+
+        let mutation = mutation.expect("we just checked, mutation has to be something!");
 
         match mutation.attribute {
             TracedTypeMuation::Remove(_) => None,
@@ -65,7 +73,7 @@ impl ObjectType {
 impl CustomType for ObjectType {
     fn assign_name(&mut self, name: String) {
         match self.name {
-            Some(_) => return,
+            Some(_) => {},
             None => self.name = Some(name),
         };
     }
@@ -73,12 +81,16 @@ impl CustomType for ObjectType {
     fn name(&self) -> &str {
         match &self.name {
             Some(name) => name,
-            None => "",
+            None => "ObjectLiteral",
         }
     }
 
     fn id(&self) -> &Uuid {
         &self.id
+    }
+
+    fn is_array(&self) -> bool {
+        self.is_array
     }
 }
 

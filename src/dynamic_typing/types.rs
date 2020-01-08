@@ -18,6 +18,7 @@ pub enum Type {
     Object(MutexRef<ObjectType>),
     Function(MutexRef<FunctionType>),
     Undefined,
+    Null,
     Mixed(Vec<Type>),
     Composed { outer: MutexRef<ObjectType>, inner: Box<Type> },
 }
@@ -66,10 +67,10 @@ impl Type {
         }
     }
 
-    pub fn query_property<T>(&self, property: &str, location: Ast::Loc<T>) -> Option<Type> {
+    pub fn query_property(&self, property: &str, location: &Location) -> Option<Type> {
         match self {
-            Type::Object(data) => data.borrow_safe(|data| data.query_property(property, Location::from(location))),
-            Type::Function(data) => data.borrow_safe(|data| data.query_property(property, Location::from(location))),
+            Type::Object(data) => data.borrow_safe(|data| data.query_property(property, location)),
+            Type::Function(data) => data.borrow_safe(|data| data.query_property(property, location)),
             _ => None,
         }
     }
@@ -109,14 +110,15 @@ impl Type {
 impl ToString for Type {
     fn to_string(&self) -> String {
         match self {
-            Type::String => "string".to_string(),
-            Type::Number => "number".to_string(),
+            Type::String => "String".to_string(),
+            Type::Number => "Number".to_string(),
             Type::Object(object) => object.borrow_safe(|object| object.name().to_owned()),
             Type::Function(object) => object.borrow_safe(|object| object.name().to_owned()),
             Type::RegExp => "RegExp".to_owned(),
-            Type::Boolean => "boolean".to_owned(),
+            Type::Boolean => "Boolean".to_owned(),
             Type::Mixed(types) => types.iter().map(|type_| type_.to_string()).collect::<Vec<String>>().join(" | "),
-            Type::Undefined => "undefined".to_owned(),
+            Type::Undefined => "Undefined".to_owned(),
+            Type::Null => "Null".to_string(),
             Type::Composed { outer, inner } => format!("{}<{}>", outer.borrow_safe(|outer| outer.name().to_owned()), inner.to_string()),
         }
     }
@@ -177,7 +179,7 @@ impl From<&Ast::Literal<'_>> for Type {
         match literal {
             Ast::Literal::String(_) => Type::String,
             Ast::Literal::Number(_) => Type::Number,
-            Ast::Literal::Null => Type::Undefined,
+            Ast::Literal::Null => Type::Null,
             Ast::Literal::True => Type::Boolean,
             Ast::Literal::RegEx(_) => Type::RegExp,
             Ast::Literal::False => Type::Boolean,

@@ -144,7 +144,7 @@ pub fn determine_expression_type(expression: &Ast::Expression, scope: &Scope) ->
                 Some(proto) => match proto {
                     Type::Object(ref object_type) => Some(CustomTypeObject::from(object_type)),
                     Type::Function(ref func_type) => Some(CustomTypeObject::from(func_type)),
-                    _ => Err(TypeError::IncompatiblePrototype { prototype: proto.to_string() })?
+                    _ => return Err(TypeError::IncompatiblePrototype { prototype: proto.to_string() }.into())
                 },
 
                 None => None,
@@ -179,7 +179,26 @@ pub fn determine_expression_type(expression: &Ast::Expression, scope: &Scope) ->
 pub fn expression_to_string(expression: &Ast::Expression) -> String {
     match expression {
         Ast::Expression::Literal(value) => literal_to_string(value),
-        Ast::Expression::Identifier(name) => name.to_string(),
-        _ => "NotRepresentable".to_string(),
+        Ast::Expression::Identifier(name) => (*name).to_string(),
+        Ast::Expression::Member(member_access) =>
+            format!("{}.{}", expression_to_string(&member_access.object), **member_access.property),
+        Ast::Expression::ComputedMember(..) => "NotRepresentable(ComputedMember)".to_string(),
+        Ast::Expression::Object(..) => "NotRepresentable(Object)".to_string(),
+        Ast::Expression::Function(..) => "NotRepresentable(Function)".to_string(),
+        Ast::Expression::Binary(..) => "NotRepresentable(Binary)".to_string(),
+        Ast::Expression::This(..) => "this".to_string(),
+        Ast::Expression::Array(..) => "Arrary".to_string(),
+        Ast::Expression::Void => "void".to_string(),
+        Ast::Expression::Sequence(..) => "NotRepresentable(Sequence)".to_string(),
+        Ast::Expression::Conditional(..) => "NotRepresentable(Conditional)".to_string(),
+        Ast::Expression::Call(..) => "NotRepresentable(Call)".to_string(),
+        Ast::Expression::Prefix(..) => "NotRepresentable(Prefix)".to_string(),
+        Ast::Expression::Postfix(..) => "NotRepresentable(Postfix)".to_string(),
+        Ast::Expression::MetaProperty(..) => "NotRepresentable(MetaProperty)".to_string(),
+        Ast::Expression::Template(..) => "NotRepresentable(Template)".to_string(),
+        Ast::Expression::TaggedTemplate(..) => "NotRepresentable(TaggedTemplate)".to_string(),
+        Ast::Expression::Spread(..) => "NotRepresentable(Spread)".to_string(),
+        Ast::Expression::Arrow(..) => "NotRepresentable(Arrow)".to_string(),
+        Ast::Expression::Class(..) => "NotRepresentable(Class)".to_string(),
     }
 }
