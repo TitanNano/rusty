@@ -15,10 +15,6 @@ impl Variable {
         &self.current_type
     }
 
-    pub fn change_type(&mut self, type_: Type) {
-        self.current_type = type_;
-    }
-
     pub fn name(&self)  -> &str {
         &self.name
     }

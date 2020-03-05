@@ -16,6 +16,7 @@ pub use self::object_type::ObjectType;
 pub use self::variable::*;
 pub use self::function_type::FunctionType;
 pub use self::scope::Scope;
+pub use self::scope::BindableScope;
 pub use self::traits::*;
 pub use self::change_trace::*;
 pub use self::custom_type::*;

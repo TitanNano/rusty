@@ -12,8 +12,9 @@ pub struct FunctionType {
     pub properties: HashMap<String, Type>,
     properties_change_trace: ChangeTrace<TracedTypeMuation>,
     invocations: Vec<(Vec<Type>, Location)>,
-
 }
+
+traitcast::traitcast!(struct FunctionType: CustomType);
 
 impl FunctionType {
     pub fn new(arguments: Vec<Variable>) -> Self {

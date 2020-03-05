@@ -54,6 +54,7 @@ impl<'ast> NewExpressionNodeFromAst<'ast, ExpressionNodeStruct<'ast>> for Expres
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct StringNodeStruct {
     id: u16,
     value: String,

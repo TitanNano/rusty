@@ -3,7 +3,7 @@ use super::{ Type, TracedTypeMuation, ChangeTrace, Location, TracedChange, Custo
 use super::traits::{ CustomType };
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, PartialEq)]
+#[derive(Debug, Serialize, PartialEq, Clone)]
 pub struct ObjectType {
     id: Uuid,
     name: Option<String>,
@@ -12,6 +12,8 @@ pub struct ObjectType {
     prototype: Option<CustomTypeObject>,
     properties_change_trace: ChangeTrace<TracedTypeMuation>,
 }
+
+traitcast::traitcast!(struct ObjectType: CustomType);
 
 impl ObjectType {
 

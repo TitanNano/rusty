@@ -1,5 +1,9 @@
 use failure::*;
 use dynamic_typing::{ Location };
+use std::sync::Arc;
+use std::collections::hash_set::HashSet;
+
+pub type ErrorVec = HashSet<Arc<ValidationError>>;
 
 #[derive(Debug, Fail)]
 pub enum ScopeError {
@@ -38,7 +42,7 @@ pub enum TypeError {
     },
 }
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Fail, Eq, PartialEq, Hash)]
 pub enum ValidationError {
 
     #[fail(display = "\"{}\" has no property \"{}\"", object, property)]
@@ -75,7 +79,13 @@ pub enum ValidationError {
         current_type: String,
         expected_type: String,
         location: Location,
-    }
+    },
+
+    #[fail(display = "\"{}\" is a useless comparison and should be removed", expression)]
+    NonsensicalComparison {
+        expression: String,
+        location: Location,
+    },
 }
 
 impl ValidationError {
@@ -85,7 +95,8 @@ impl ValidationError {
             ValidationError::UndefinedVariable { .. } => &Location { column: 0, end: 0, line: 0, start: 0, },
             ValidationError::AssignTypeMissmatch { location, .. } => &location,
             ValidationError::CompareTypeMissmatch { location, .. } => &location,
-            ValidationError::InvalidType { location, .. } => &location
+            ValidationError::InvalidType { location, .. } => &location,
+            ValidationError::NonsensicalComparison { location, .. } => &location,
         }
     }
 }

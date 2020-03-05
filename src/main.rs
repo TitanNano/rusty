@@ -11,6 +11,8 @@ extern crate erased_serde;
 extern crate uuid;
 extern crate toolshed;
 extern crate rand;
+extern crate traitcast;
+extern crate traitcast_core;
 
 mod dynamic_typing;
 mod statics;
@@ -30,19 +32,21 @@ use ratel::{ parse, ast as Ast };
 use failure::*;
 
 use dynamic_typing::{
-    Type, Scope, Variable, VariableKind, CustomTypeObject, new_mutex_ref
+    Type, Scope, Variable, VariableKind, CustomTypeObject,
 };
 use statics::{ OBJECT };
 use tracing::{ tracing_pass };
 use expressions::{ determine_expression_type };
 use validation::{ validation_pass };
+use error::ValidationError;
+use std::sync::Arc;
 
 fn main() {
     let global_object: Variable = Variable::new(String::from("Object"), (&*OBJECT).clone(), VariableKind::Const);
 
     let mut static_root_scope: Scope = Scope::new(String::from("StaticRoot"), None);
 
-    static_root_scope.variables = vec!(new_mutex_ref(global_object));
+    static_root_scope.add(global_object);
 
     // read test.js
     let mut file = File::open("/Users/Jovan/rusty/test.js").unwrap();
@@ -67,13 +71,27 @@ fn main() {
         println!("Error while analyzing scope <{}>: {:?}", module_scope.name(), error);
     }
 
-    let (module_scope, tracing_errors) = tracing_pass(module_body, module_scope);
+    let (mut module_scope, tracing_errors) = tracing_pass(module_body, module_scope);
 
     for error in tracing_errors {
         println!("Error while tracing scope <{}> for type changes: {:?}", module_scope.name(), error);
     }
 
-    let validation_errors = validation_pass(module_body, &module_scope);
+    let mut validation_errors: Vec<Arc<ValidationError>> = validation_pass(module_body, &mut module_scope).into_iter().collect();
+
+    validation_errors.sort_by(|a, b| {
+        if a.location().start < b.location().start {
+            return std::cmp::Ordering::Less
+        }
+
+        if a.location().start > b.location().start {
+            return std::cmp::Ordering::Greater
+        }
+
+        std::cmp::Ordering::Equal
+    });
+
+    println!("{}", validation_errors.len());
 
     for error in validation_errors {
         let (line_start, column_start) = get_line_from_offset(error.location().start, &structured_content);

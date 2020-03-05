@@ -51,3 +51,9 @@ PageController.pageTitle = 'New Page';
 PageController.state = 'text';
 
 list2 = "not a list any more!";
+
+if (Controller.prop) {
+    Controller.prop;
+}
+
+Controller.prop;

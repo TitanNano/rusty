@@ -10,6 +10,9 @@ serde = { version = "*", features = ['rc'] }
 serde_derive = "*"
 serde_json = "*"
 rand = "^0.7.0"
+traitcast = "0.5.0"
+inventory = "0.1.5"
+traitcast_core = "0.2.0"
 
 #[dependencies.ecmascript]
 #source = "https://github.com/dat2/ecmascript"

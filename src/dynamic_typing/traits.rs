@@ -4,6 +4,7 @@ use std::sync::{ Mutex };
 
 use erased_serde::Serialize;
 use uuid::Uuid;
+
 use super::change_trace::{ TracedTypeMuation, Location };
 use super::types::Type;
 
@@ -27,12 +28,12 @@ pub trait TracedChange<TC, NV, L> {
 serialize_trait_object!(CustomType);
 
 pub trait SafeBorrow<T> {
-    fn borrow_safe<B, Func: FnOnce(&T) -> B>(&self, scope: Func) -> B;
+    fn borrow_safe<Return, Func: FnOnce(&T) -> Return>(&self, scope: Func) -> Return;
     fn borrow_mut_safe<B, Func: FnOnce(&mut T) -> B>(&self, scope: Func) -> B;
 }
 
 impl<T> SafeBorrow<T> for Mutex<T> {
-    fn borrow_safe<B, Func: FnOnce(&T) -> B>(&self, scope: Func) -> B {
+    fn borrow_safe<Return, Func: FnOnce(&T) -> Return>(&self, scope: Func) -> Return {
         (scope)(&self.try_lock().unwrap())
     }
 

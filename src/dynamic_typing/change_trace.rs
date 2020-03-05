@@ -61,7 +61,7 @@ pub enum TracedTypeMuation {
     Update(String),
 }
 
-#[derive(Debug, Serialize, PartialEq, Clone, Hash)]
+#[derive(Debug, Serialize, Eq, PartialEq, Clone, Hash)]
 pub struct Location {
     pub start: u32,
     pub end: u32,

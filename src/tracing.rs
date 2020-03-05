@@ -8,12 +8,8 @@ pub fn tracing_pass<'a>(ast: Ast::StatementList, mut scope: Scope<'a>) -> (Scope
     let mut error_collection = vec!();
 
     for statement in ast {
-        match statement.item {
-            Ast::Statement::Expression(expression) => {
-                trace_expression(expression, &mut scope, &mut error_collection);
-            },
-
-            _ => ()
+        if let Ast::Statement::Expression(expression) = statement.item {
+            trace_expression(expression, &mut scope, &mut error_collection);
         }
     }
 
