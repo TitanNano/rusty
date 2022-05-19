@@ -1,25 +1,25 @@
-mod types;
-mod object_type;
-mod function_type;
-mod variable;
-mod traits;
-mod scope;
 mod change_trace;
 mod custom_type;
+mod function_type;
+mod object_type;
+mod scope;
+mod traits;
+mod types;
+mod variable;
 
-use std::sync::{ Arc, Mutex };
-use std::ops::Deref;
 use std::fmt::Debug;
+use std::ops::Deref;
+use std::sync::{Arc, Mutex};
 
-pub use self::types::Type;
-pub use self::object_type::ObjectType;
-pub use self::variable::*;
-pub use self::function_type::FunctionType;
-pub use self::scope::Scope;
-pub use self::scope::BindableScope;
-pub use self::traits::*;
 pub use self::change_trace::*;
 pub use self::custom_type::*;
+pub use self::function_type::FunctionType;
+pub use self::object_type::ObjectType;
+pub use self::scope::BindableScope;
+pub use self::scope::{Scope, ScopeRef, Scoped};
+pub use self::traits::*;
+pub use self::types::Type;
+pub use self::variable::*;
 
 pub struct CompMutex<T> {
     inner: Mutex<T>,
@@ -29,7 +29,9 @@ pub type MutexRef<T> = Arc<CompMutex<Box<T>>>;
 
 impl<T> CompMutex<T> {
     fn new(value: T) -> Self {
-        Self { inner: Mutex::new(value) }
+        Self {
+            inner: Mutex::new(value),
+        }
     }
 }
 
@@ -41,7 +43,7 @@ impl<T> Deref for CompMutex<T> {
     }
 }
 
-impl <T: Debug + 'static> Debug for CompMutex<T> {
+impl<T: Debug + 'static> Debug for CompMutex<T> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         (**self).fmt(formatter)
     }
@@ -53,8 +55,14 @@ impl<T: PartialEq> PartialEq for CompMutex<T> {
     }
 }
 
-impl <T: serde::Serialize> serde::Serialize for CompMutex<T> {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Error> where S: serde::Serializer {
+impl<T: serde::Serialize> serde::Serialize for CompMutex<T> {
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Error>
+    where
+        S: serde::Serializer,
+    {
         (**self).serialize(serializer)
     }
 }

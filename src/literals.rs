@@ -1,4 +1,4 @@
-use ratel::{ ast as Ast };
+use ratel::ast as Ast;
 
 pub fn literal_to_string(literal: &Ast::Literal) -> String {
     match literal {

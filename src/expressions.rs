@@ -1,16 +1,16 @@
-use ratel::{ ast as Ast };
+use ratel::ast as Ast;
 use dynamic_typing::{
-    Type, Scope, SafeBorrow, CustomTypeObject, FunctionType, ObjectType,
-    new_mutex_ref, CustomType
+    Type, SafeBorrow, CustomTypeObject, FunctionType, ObjectType,
+    new_mutex_ref, CustomType, Scoped, ScopeRef
 };
 use failure::*;
-use statics::{ ARRAY_PROTOTYPE };
+use statics::ARRAY_PROTOTYPE;
 use std::collections::HashMap;
-use error::{ TypeError };
-use literals::{ literal_to_string };
+use error::TypeError;
+use literals::literal_to_string;
 use objects::{ type_from_properties, determine_member_type };
 
-pub fn determine_expression_type(expression: &Ast::Expression, scope: &Scope) -> Result<Type, Error> {
+pub fn determine_expression_type(expression: &Ast::Expression, scope: &ScopeRef) -> Result<Type, Error> {
     let var_type: Type = match expression {
         Ast::Expression::Void => Type::Undefined,
 
@@ -34,7 +34,7 @@ pub fn determine_expression_type(expression: &Ast::Expression, scope: &Scope) ->
         Ast::Expression::Object(object_expression) => {
             let properties: Vec<Ast::Property> = object_expression.body.into_iter().map(|property| property.item).collect();
 
-            type_from_properties(&properties, &scope)?
+            type_from_properties(&properties, scope)?
         },
 
         Ast::Expression::Function { .. } => {
@@ -53,8 +53,8 @@ pub fn determine_expression_type(expression: &Ast::Expression, scope: &Scope) ->
         Ast::Expression::Conditional(conditional_expression) => {
             let Ast::expression::ConditionalExpression { consequent, alternate, .. } = conditional_expression;
 
-            let left_type = determine_expression_type(&alternate.item, &scope)?;
-            let right_type = determine_expression_type(&consequent.item, &scope)?;
+            let left_type = determine_expression_type(&alternate.item, scope)?;
+            let right_type = determine_expression_type(&consequent.item, scope)?;
 
             if left_type == right_type {
                 left_type
@@ -66,9 +66,12 @@ pub fn determine_expression_type(expression: &Ast::Expression, scope: &Scope) ->
         //this is not right because we actually need the return type not the function type
         Ast::Expression::Call(call_expression) => {
             let function_type = determine_expression_type(&call_expression.callee.item, scope)?;
+            let argument_types: Vec<Type> = call_expression.arguments.iter().map(|expression_node| {
+                determine_expression_type(&**expression_node, scope)
+            }).collect::<Result<_, Error>>()?;
 
             match function_type {
-                Type::Function(function_type) => function_type.borrow_safe(|function_type| function_type.return_type()),
+                Type::Function(function_type) => function_type.borrow_safe(|function_type| function_type.return_type(&argument_types)),
                 _ => panic!("unable to call {}, it's not a function!", expression_to_string(&call_expression.callee.item))
             }
         },
@@ -78,7 +81,7 @@ pub fn determine_expression_type(expression: &Ast::Expression, scope: &Scope) ->
 
         Ast::Expression::Sequence(list) => {
             match list.body.into_iter().last() {
-                Some(expression) => determine_expression_type(&expression, &scope)?,
+                Some(expression) => determine_expression_type(&expression, scope)?,
                 None => unreachable!("it's not possible to have an empty expression list!"),
             }
         },
@@ -94,7 +97,7 @@ pub fn determine_expression_type(expression: &Ast::Expression, scope: &Scope) ->
         }
 
         //here we also need the return type instead of the function type
-        Ast::Expression::TaggedTemplate(expression) => determine_expression_type(&expression.tag.item, &scope)?,
+        Ast::Expression::TaggedTemplate(expression) => determine_expression_type(&expression.tag.item, scope)?,
 
         // it's not quite clear what this is
         Ast::Expression::MetaProperty(_expression) => Type::Undefined,

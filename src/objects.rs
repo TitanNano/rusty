@@ -1,20 +1,20 @@
 use std::collections::HashMap;
 use failure::*;
-use dynamic_typing::{ Scope, new_mutex_ref, ObjectType, CustomTypeObject, Type, FunctionType };
-use ratel::{ ast as Ast };
+use dynamic_typing::{ ScopeRef, new_mutex_ref, ObjectType, CustomTypeObject, Type, FunctionType };
+use ratel::ast as Ast;
 use expressions::{ expression_to_string, determine_expression_type };
-use statics::{ OBJECT_PROTOTYPE };
-use error::{ AccessError };
+use statics::OBJECT_PROTOTYPE;
+use error::AccessError;
 
-pub fn type_from_properties(properties: &[Ast::Property], scope: &Scope) -> Result<Type, Error> {
+pub fn type_from_properties(properties: &[Ast::Property], scope: &ScopeRef) -> Result<Type, Error> {
     let properties: Result<HashMap<String, Type>, Error> = properties.iter().map(|property| {
         let transformed = match property {
             Ast::Property::Literal { key, value } => {
-                (property_to_string(&key.item), determine_expression_type(&value, &scope)?)
+                (property_to_string(&key.item), determine_expression_type(&value, scope)?)
             },
 
             Ast::Property::Shorthand(property) => {
-                ((*property).to_string(), determine_expression_type(&Ast::Expression::Identifier(property), &scope)?)
+                ((*property).to_string(), determine_expression_type(&Ast::Expression::Identifier(property), scope)?)
             },
 
             Ast::Property::Method { key, value: _value } => {
@@ -51,7 +51,7 @@ pub fn type_from_properties(properties: &[Ast::Property], scope: &Scope) -> Resu
     Ok(new_type)
 }
 
-pub fn determine_member_type(expression: &Ast::Expression, property: Ast::Node<'_, &str>, scope: &Scope) -> Result<Type, Error> {
+pub fn determine_member_type(expression: &Ast::Expression, property: Ast::Node<'_, &str>, scope: &ScopeRef) -> Result<Type, Error> {
     let object = determine_expression_type(expression, scope)?;
     let member_type = object.properties(|properties| {
         let mut member_type: Option<Type> = None;

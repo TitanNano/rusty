@@ -1,22 +1,24 @@
-use ratel::{ ast as Ast };
-use dynamic_typing::{ TracedTypeChange, Location, TracedTypeMuation, Scope, SafeBorrow, Type, TracedChange };
+use ratel::ast as Ast;
+use dynamic_typing::{
+    TracedTypeChange, Location, TracedTypeMuation, Scoped, ScopeRef, SafeBorrow, Type, TracedChange
+};
 use failure::*;
 use expressions::{ determine_expression_type, expression_to_string };
-use error::{ TypeError };
+use error::TypeError;
 
-pub fn tracing_pass<'a>(ast: Ast::StatementList, mut scope: Scope<'a>) -> (Scope<'a>, Vec<Error>) {
+pub fn tracing_pass<'a>(ast: Ast::StatementList, scope: ScopeRef) -> (ScopeRef, Vec<Error>) {
     let mut error_collection = vec!();
 
     for statement in ast {
         if let Ast::Statement::Expression(expression) = statement.item {
-            trace_expression(expression, &mut scope, &mut error_collection);
+            trace_expression(expression, scope.clone(), &mut error_collection);
         }
     }
 
     (scope, error_collection)
 }
 
-fn trace_expression(expression: Ast::ExpressionNode, scope: &mut Scope, error_collection: &mut Vec<Error>) {
+fn trace_expression(expression: Ast::ExpressionNode, scope: ScopeRef, error_collection: &mut Vec<Error>) {
 
     match expression.item {
         Ast::Expression::Binary(binary_expression) => {
@@ -53,7 +55,7 @@ fn trace_expression(expression: Ast::ExpressionNode, scope: &mut Scope, error_co
             }
 
             if let Ast::Expression::Member(member_expression) = receiver.item {
-                let object_type = match determine_expression_type(&member_expression.object.item, scope) {
+                let object_type = match determine_expression_type(&member_expression.object.item, &scope) {
                     Ok(object_type) => object_type,
                     Err(error) => { error_collection.push(error); return; },
                 };
@@ -96,7 +98,7 @@ fn trace_expression(expression: Ast::ExpressionNode, scope: &mut Scope, error_co
 
         Ast::Expression::Call(call_expression) => {
             let arguments_result: Result<Vec<Type>, Error> = call_expression.arguments.into_iter()
-                .map(|expression| determine_expression_type(expression, scope)).collect();
+                .map(|expression| determine_expression_type(expression, &scope)).collect();
 
             let arguments = match arguments_result {
                 Ok(arguments) => arguments,
@@ -106,7 +108,7 @@ fn trace_expression(expression: Ast::ExpressionNode, scope: &mut Scope, error_co
                 }
             };
 
-            let callee_type = match determine_expression_type(&call_expression.callee.item, scope) {
+            let callee_type = match determine_expression_type(&call_expression.callee.item, &scope) {
                 Ok(callee_type) => callee_type,
                 Err(error) => {
                     error_collection.push(error);

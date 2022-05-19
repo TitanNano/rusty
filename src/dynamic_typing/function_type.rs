@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use super::{ Variable, Type, ChangeTrace, TracedTypeMuation, Location, TracedChange };
 use super::traits::CustomType;
+use super::{ChangeTrace, Location, TracedChange, TracedTypeMuation, Type, Variable};
 
 #[derive(PartialEq, Debug, Clone, Serialize)]
 pub struct FunctionType {
@@ -24,11 +24,11 @@ impl FunctionType {
             arguments,
             properties: HashMap::new(),
             properties_change_trace: ChangeTrace::new(),
-            invocations: vec!(),
+            invocations: vec![],
         }
     }
 
-    pub fn return_type(&self) -> Type {
+    pub fn return_type(&self, _args: &Vec<Type>) -> Type {
         Type::Undefined
     }
 
@@ -49,7 +49,6 @@ impl FunctionType {
             }
         });
 
-
         match mutation?.attribute {
             TracedTypeMuation::Remove(_) => None,
             TracedTypeMuation::Add(_) => Some(mutation?.current_type.clone()),
@@ -61,7 +60,7 @@ impl FunctionType {
 impl CustomType for FunctionType {
     fn assign_name(&mut self, name: String) {
         match self.name {
-            Some(_) => {},
+            Some(_) => {}
             None => self.name = Some(name),
         };
     }
@@ -84,6 +83,7 @@ impl CustomType for FunctionType {
 
 impl TracedChange<TracedTypeMuation, Type, Location> for FunctionType {
     fn change(&mut self, change: TracedTypeMuation, new_type: Type, location: Location) {
-        self.properties_change_trace.change(change, new_type, location)
+        self.properties_change_trace
+            .change(change, new_type, location)
     }
 }

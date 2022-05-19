@@ -24,6 +24,9 @@ mod objects;
 mod traveler;
 mod validation;
 mod ast_nodes;
+mod meta_data_collection;
+mod expression_meta_data;
+mod context;
 
 use std::fs::File;
 use std::io::prelude::*;
@@ -32,21 +35,28 @@ use ratel::{ parse, ast as Ast };
 use failure::*;
 
 use dynamic_typing::{
-    Type, Scope, Variable, VariableKind, CustomTypeObject,
+    Type, Scope, Variable, VariableKind, CustomTypeObject, MutexRef,
+    Scoped, new_mutex_ref, ScopeRef
 };
-use statics::{ OBJECT };
-use tracing::{ tracing_pass };
-use expressions::{ determine_expression_type };
-use validation::{ validation_pass };
+use statics::OBJECT;
+use tracing::tracing_pass;
+use expressions::determine_expression_type;
+use validation::validation_pass;
 use error::ValidationError;
 use std::sync::Arc;
+
+use context::Context;
+use expression_meta_data::MetaHashMap;
+
 
 fn main() {
     let global_object: Variable = Variable::new(String::from("Object"), (&*OBJECT).clone(), VariableKind::Const);
 
-    let mut static_root_scope: Scope = Scope::new(String::from("StaticRoot"), None);
+    let mut static_root_scope = Scope::new(String::from("StaticRoot"), None);
 
     static_root_scope.add(global_object);
+
+    let static_root_scope_ref = new_mutex_ref(static_root_scope);
 
     // read test.js
     let mut file = File::open("/Users/Jovan/rusty/test.js").unwrap();
@@ -63,21 +73,26 @@ fn main() {
 
     let module_body = module.body();
 
-    let (module_scope, errors) = analyze_ast(module_body, &static_root_scope);
-
-    // println!("{}", serde_json::to_string_pretty(&module_scope).unwrap());
+    let (module_scope, errors) = analyze_ast(module_body, static_root_scope_ref);
 
     for error in errors {
         println!("Error while analyzing scope <{}>: {:?}", module_scope.name(), error);
     }
 
-    let (mut module_scope, tracing_errors) = tracing_pass(module_body, module_scope);
+    let (module_scope, tracing_errors) = tracing_pass(module_body, module_scope);
 
     for error in tracing_errors {
         println!("Error while tracing scope <{}> for type changes: {:?}", module_scope.name(), error);
     }
 
-    let mut validation_errors: Vec<Arc<ValidationError>> = validation_pass(module_body, &mut module_scope).into_iter().collect();
+    let data_map = MetaHashMap::new();
+    let mut context = Context::new(module_scope, new_mutex_ref(data_map));
+
+    {
+        validation_pass(module_body, &mut context);
+    }
+
+    let mut validation_errors: Vec<Arc<ValidationError>> = context.errors.iter().map(|error| error.clone()).collect();
 
     validation_errors.sort_by(|a, b| {
         if a.location().start < b.location().start {
@@ -112,9 +127,10 @@ fn main() {
 
 }
 
-fn analyze_ast<'a, 'b>(body: Ast::StatementList, static_root_scope: &'a Scope<'b>) -> (Scope<'a>, Vec<Error>) {
+fn analyze_ast<'a, 'b>(body: Ast::StatementList, static_root_scope: MutexRef<Scope>) -> (MutexRef<Scope>, Vec<Error>) {
 
-    let mut module_scope = Scope::new(String::from("ModuleScope"), Some(static_root_scope));
+    let module_scope = Scope::new(String::from("ModuleScope"), Some(static_root_scope));
+    let mut module_scope_ref = new_mutex_ref(module_scope);
     let mut scope_errors = vec!();
 
     for statement in body {
@@ -124,18 +140,18 @@ fn analyze_ast<'a, 'b>(body: Ast::StatementList, static_root_scope: &'a Scope<'b
             let Ast::statement::DeclarationStatement { declarators: declarations, kind } = declaration_statement;
 
             for declaration in declarations {
-                let variable = analyze_declaration(declaration.item, kind, &module_scope);
+                let variable = analyze_declaration(declaration.item, kind, module_scope_ref.clone());
 
                 match variable {
                     Ok(variable) => {
 
                         match variable.current_type() {
-                            Type::Object(data) => module_scope.add_type(CustomTypeObject::from(data)),
-                            Type::Function(data) => module_scope.add_type(CustomTypeObject::from(data)),
+                            Type::Object(data) => module_scope_ref.add_type(CustomTypeObject::from(data)),
+                            Type::Function(data) => module_scope_ref.add_type(CustomTypeObject::from(data)),
                             _ => ()
                         };
 
-                        module_scope.add(variable)
+                        module_scope_ref.add(variable)
                     },
                     Err(e) => scope_errors.push(e),
                 }
@@ -143,10 +159,10 @@ fn analyze_ast<'a, 'b>(body: Ast::StatementList, static_root_scope: &'a Scope<'b
         }
     }
 
-    (module_scope, scope_errors)
+    (module_scope_ref, scope_errors)
 }
 
-fn analyze_declaration(declaration: Ast::Declarator, kind: Ast::DeclarationKind, scope: &Scope) -> Result<Variable, Error> {
+fn analyze_declaration(declaration: Ast::Declarator, kind: Ast::DeclarationKind, scope: ScopeRef) -> Result<Variable, Error> {
     let variable_name = match declaration.id.item {
         Ast::Pattern::Identifier(name) => name.to_string(),
         Ast::Pattern::RestElement { argument } => argument.item.to_string(),
@@ -171,7 +187,7 @@ fn analyze_declaration(declaration: Ast::Declarator, kind: Ast::DeclarationKind,
     };
 
     let mut variable_type = match declaration.init {
-        Some(value) => determine_expression_type(&value, scope)?,
+        Some(value) => determine_expression_type(&value, &scope)?,
         None => Type::Undefined,
     };
 
